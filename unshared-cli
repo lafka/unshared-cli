@@ -123,7 +123,9 @@ parse_args() {
 				# mount get evaluated later, to we can bind $root lazily
 				PREEXEC="$PREEXEC mkdir -p \$ROOT/${_data_target} &&"
 				POSTEXEC="$POSTEXEC umount \$ROOT/${_data_target} &&"
-				MOUNT="$MOUNT && mount --make-private ${_data_opts} ${_data_src} \$ROOT${_data_target}"
+				MOUNT="$MOUNT && " \
+					"mount ${_data_opts} ${_data_src} \$ROOT/${_data_target} && "  \
+					"mount --make-private \$ROOT/${_data_target}"
 
 				shift 2 ;;
 			* )
