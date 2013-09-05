@@ -56,6 +56,7 @@ gzip -dc /boot/initramfs-linux.img | cpio -i
 + possibly special needs?
  + whoami: `libnss{3,_,compat_files}.so*`
  + Needs `lo` interface for starting `erl`
+ + libncurses.so.5 libtinfo.so.5 libcrypto.so.1.0.0.0 libz.so.1
 
 ### User NS
 
