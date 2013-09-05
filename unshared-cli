@@ -32,11 +32,13 @@ set -e
 UNSHARED_ROOT=${UNSHARED_ROOT:-/var/unshared}
 UNSHARED_ARGS=""
 
+loup="ifconfig lo 127.0.0.1 up"
+
 export NAME=${NAME:-"unshared-$(tr -cd '[a-z0-9A-Z]' < /dev/urandom | head -c 4)"}
-export ROOT=${ROOT:-""}
-export EXPR=${EXPR:-"ifconfig lo 127.0.0.1 up"}
-export MOUNT=${MOUNT:-"true"}
-export POSTEXEC=${POSTEXEC:-""}
+export ROOT="${ROOT:-''}"
+export EXPR="${EXPR:=$loup}"
+export MOUNT="${MOUNT:-'true'}"
+export POSTEXEC="${POSTEXEC:-''}"
        PREEXEC=""
 
 get_root() {
