@@ -32,17 +32,21 @@ set -e
 UNSHARED_ROOT=${UNSHARED_ROOT:-/var/unshared}
 UNSHARED_ARGS=""
 
-loup="ifconfig lo 127.0.0.1 up"
-
 export NAME=${NAME:-"unshared-$(tr -cd '[a-z0-9A-Z]' < /dev/urandom | head -c 4)"}
-export ROOT="${ROOT:-''}"
-export EXPR="${EXPR:=$loup}"
-export MOUNT="${MOUNT:-'true'}"
-export POSTEXEC="${POSTEXEC:-''}"
-       PREEXEC=""
+export ROOT="${ROOT:-/}"
+export EXPR="${EXPR:=true}"
+export MOUNT="${MOUNT:-true}"
+export PRECHROOT="${PRECHROOT:-true}"
+export POSTEXEC="${POSTEXEC:-true}"
+       PREEXEC="true"
 
 get_root() {
 	[ ! -z "$1" ] && echo $UNSHARED_ROOT/$1 || echo "/"
+}
+
+cleanup() {
+	echo "=> Exiting ..."
+	pkill -P $(pgrep -P $$)
 }
 
 run() {
@@ -62,7 +66,11 @@ run() {
 			echo "=> Mounting ..."
 			eval $MOUNT
 
-			echo "=> Preparing chroot ..."
+			echo "=> Prechroot ..."
+			eval $PRECHROOT
+
+			echo "=> Preparing chroot ($ROOT)..."
+
 			echo "#!/bin/sh" > $ROOT/run-unshare
 			echo "echo '=> Executing ...'" >> $ROOT/run-unshare
 			echo $EXPR >> $ROOT/run-unshare
@@ -70,11 +78,13 @@ run() {
 			chmod +x $ROOT/run-unshare
 
 			echo "=> Entering chroot ..."
+
 			chroot $ROOT /run-unshare
 
-			echo "=> Performing post-exec tasks ..."
+			echo "=> Post-exec ..."
 			eval $POSTEXEC
 			;;
+
 		"" )
 			echo "usage: $0 spawn|invoker|get-root"
 			exit 0 ;;
@@ -103,8 +113,48 @@ parse_args() {
 				shift 2;;
 
 			--exec )
-				EXPR="$EXPR && $2"
-				shift 2 ;;
+				cmd=""; shift;
+				while test $# -gt 0; do case $1 in
+					-*)
+						EXEC="$EXEC && $cmd"
+						break ;;
+					* )
+						cmd="$cmd $1"
+						shift ;;
+				esac; done ;;
+
+			--preexec )
+				cmd=""; shift;
+				while test $# -gt 0; do case $1 in
+					-*)
+						PREEXEC="$PREEXEC && $cmd"
+						break ;;
+					* )
+						cmd="$cmd $1"
+						shift ;;
+				esac; done ;;
+
+			--postexec )
+				cmd=""; shift;
+				while test $# -gt 0; do case $1 in
+					-*)
+						POSTEXEC="$POSTEXEC && $cmd"
+						break ;;
+					* )
+						cmd="$cmd $1"
+						shift ;;
+				esac; done ;;
+
+			--prechroot )
+				cmd=""; shift;
+				while test $# -gt 0; do case $1 in
+					-*)
+						PRECHROOT="$PRECHROOT && $cmd"
+						break ;;
+					* )
+						cmd="$cmd $1"
+						shift ;;
+				esac; done ;;
 
 			--data-dir )
 				_data_src=$(echo $2 | awk -F: '{print $1}')
@@ -123,11 +173,13 @@ parse_args() {
 				# mount get evaluated later, to we can bind $root lazily
 				PREEXEC="$PREEXEC mkdir -p \$ROOT/${_data_target} &&"
 				POSTEXEC="$POSTEXEC umount \$ROOT/${_data_target} &&"
-				MOUNT="$MOUNT && " \
-					"mount ${_data_opts} ${_data_src} \$ROOT/${_data_target} && "  \
-					"mount --make-private \$ROOT/${_data_target}"
+				MOUNT="$MOUNT && mount ${_data_opts} ${_data_src} \$ROOT/${_data_target} && mount --make-private \$ROOT/${_data_target}"
 
 				shift 2 ;;
+			--)
+				shift;
+				EXPR="$EXPR && $@"
+				break ;;
 			* )
 				echo "error: invalid argument: '$1'"
 				exit 1 ;;
@@ -137,19 +189,21 @@ parse_args() {
 
 run_unshare() {
 	# expand mount
-	PREEXEC=$(eval 'echo '$(echo $PREEXEC | sed 's/&/\\&/g')" true")
-	POSTEXEC=$(eval 'echo '$(echo $POSTEXEC | sed 's/&/\\&/g')" true")
+	PREEXEC=$(eval 'echo '$(echo $PREEXEC | sed 's/&/\\&/g'))
+	POSTEXEC=$(eval 'echo '$(echo $POSTEXEC | sed 's/&/\\&/g'))
+	PRECHROOT=$(eval 'echo '$(echo $PRECHROOT | sed 's/&/\\&/g'))
 	MOUNT=$(eval 'echo '$(echo $MOUNT | sed 's/&/\\&/g'))
 
 	echo "spawn $NAME in $ROOT"
 	echo "unshared: $UNSHARED_ARGS"
 	echo "preexec:  $PREEXEC"
 	echo "postexec: $POSTEXEC"
+	echo "prechroot:  $PRECHROOT"
 	echo "mounts:    $MOUNT"
 	echo "execs:     $EXPR"
 
 	echo "=> Performing pre-exec tasks ..."
-	$PREEXEC || { echo "error executing preexec exiting"; exit 2; }
+	eval $PREEXEC || { echo "error executing preexec exiting"; exit 2; }
 
 	echo "=> Calling unshare [$UNSHARED_ARGS]"
 	exec env -i \
@@ -158,6 +212,7 @@ run_unshare() {
 		EXPR="$EXPR" \
 		MOUNT="$MOUNT" \
 		POSTEXEC="$POSTEXEC" \
+		PRECHROOT="$PRECHROOT" \
 		HOME="/var" \
 		unshare $UNSHARED_ARGS $0 invoker
 }
