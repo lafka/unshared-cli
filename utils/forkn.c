@@ -54,7 +54,7 @@ int main(int argc, char **argv, char **envp)
 	/*
 	 * new process group
 	 */
-	setsid();
+	//setsid();
 	rc = execve(execargs[0], execargs, envp);
 	if(rc){
 		fprintf(stderr, "Failed to exec %s, %s\n", execargs[0], strerror(errno));
