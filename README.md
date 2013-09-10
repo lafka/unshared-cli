@@ -12,8 +12,6 @@ To learn more about Linux namespaces see  `unshare(1)` and https://lwn.net/Artic
 
 ## Need hacks:
 
-+ Wait for setup signal: i.e. wait until external network is up (netns etc)
-+ Smoother integration with bridge-utils???? 
 + Use pivot_root instead of chroot
 + Make --pid and --user namespaces work
 
@@ -129,3 +127,12 @@ unshared-cli spawn
 # ifconfig int3 172.3.0.2/24
 # netcat -l 0.0.0.0 7666
 ```
+
+```bash
+# Use `initnetns` to handle setup of network namespace
+./unshared-cli spawn \
+	--uts --ipc \
+	--preexec utils/initnetns mybr \$NAME 4.5.6.7/24 \
+	--chroot utils/forkn \'echo die\' /bin/ip netns exec \$NAME chroot \
+	--postexec utils/destroynetns mybr \$NAME
+	-- /bin/netcat -l 7001
