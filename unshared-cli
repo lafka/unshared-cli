@@ -32,11 +32,11 @@ set -e
 UNSHARED_ROOT=${UNSHARED_ROOT:-/var/unshared}
 UNSHARED_ARGS=""
 
-export NAME=${NAME:-"unshared-$(tr -cd '[a-z0-9A-Z]' < /dev/urandom | head -c 4)"}
+export NAME=${NAME:-"u-$(tr -cd 'a-z0-9A-Z' < /dev/urandom | head -c 4)"}
 export ROOT="${ROOT:-/}"
 export EXPR="${EXPR:=true}"
 export MOUNT="${MOUNT:-true}"
-export PRECHROOT="${PRECHROOT:-true}"
+export CHROOT="${CHROOT:-chroot}"
 export POSTEXEC="${POSTEXEC:-true}"
        PREEXEC="true"
 
@@ -66,20 +66,17 @@ run() {
 			echo "=> Mounting ..."
 			eval $MOUNT
 
-			echo "=> Prechroot ..."
-			eval $PRECHROOT
-
 			echo "=> Preparing chroot ($ROOT)..."
 
-			echo "#!/bin/sh" > $ROOT/run-unshare
-			echo "echo '=> Executing ...'" >> $ROOT/run-unshare
-			echo $EXPR >> $ROOT/run-unshare
+			echo "#!/bin/sh" > $ROOT/run-unshare-$NAME
+			echo "echo '=> Executing ...'" >> $ROOT/run-unshare-$NAME
+			echo $EXPR >> $ROOT/run-unshare >> $ROOT/run-unshare-$NAME
 
-			chmod +x $ROOT/run-unshare
+			chmod +x $ROOT/run-unshare-$NAME
 
 			echo "=> Entering chroot ..."
 
-			chroot $ROOT /run-unshare
+			eval $CHROOT $ROOT /run-unshare-$NAME
 
 			echo "=> Post-exec ..."
 			eval $POSTEXEC
@@ -145,11 +142,11 @@ parse_args() {
 						shift ;;
 				esac; done ;;
 
-			--prechroot )
+			--chroot )
 				cmd=""; shift;
 				while test $# -gt 0; do case $1 in
 					-*)
-						PRECHROOT="$PRECHROOT && $cmd"
+						CHROOT="$cmd"
 						break ;;
 					* )
 						cmd="$cmd $1"
@@ -191,14 +188,12 @@ run_unshare() {
 	# expand mount
 	PREEXEC=$(eval 'echo '$(echo $PREEXEC | sed 's/&/\\&/g'))
 	POSTEXEC=$(eval 'echo '$(echo $POSTEXEC | sed 's/&/\\&/g'))
-	PRECHROOT=$(eval 'echo '$(echo $PRECHROOT | sed 's/&/\\&/g'))
 	MOUNT=$(eval 'echo '$(echo $MOUNT | sed 's/&/\\&/g'))
 
 	echo "spawn $NAME in $ROOT"
 	echo "unshared: $UNSHARED_ARGS"
 	echo "preexec:  $PREEXEC"
 	echo "postexec: $POSTEXEC"
-	echo "prechroot:  $PRECHROOT"
 	echo "mounts:    $MOUNT"
 	echo "execs:     $EXPR"
 
@@ -212,7 +207,7 @@ run_unshare() {
 		EXPR="$EXPR" \
 		MOUNT="$MOUNT" \
 		POSTEXEC="$POSTEXEC" \
-		PRECHROOT="$PRECHROOT" \
+		CHROOT="$CHROOT" \
 		HOME="/var" \
 		unshare $UNSHARED_ARGS $0 invoker
 }

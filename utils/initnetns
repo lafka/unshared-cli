@@ -1,0 +1,25 @@
+#!/bin/sh
+
+set -e
+
+[ 3 != $# ] && {
+	echo "needs more foooood...";
+	echo "usage: $0 <bridge> <name> <addr>";
+	exit 1; }
+
+bridge=$1
+name=$2
+peername=${name}peer
+addr=$3
+
+ip netns list | grep -q $name || ip netns add $name
+
+ip link show $name > /dev/null 2>&1 || {
+	ip link add name $name type veth peer name $peername;
+	ifconfig $name $addr up;
+	ip link set dev $name netns $name; }
+
+ifconfig $peername up
+
+brctl show | grep -qP "^$bridge\s" || brctl addbr $bridge
+brctl show | grep -qP "\s$peername\$" || brctl addif $bridge $peername
