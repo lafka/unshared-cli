@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+[ 2 != $# ] && {
+	echo "needs more foooood...";
+	echo "usage: $0 <bridge> <name>";
+	exit 1; }
+
+bridge=$1
+name=$2
+
+brctl show | grep -qP "\s$name\$" && brctl delif $bridge $name
+ip link show $name > /dev/null 2>&1 && ip link delete dev $name
+ip netns list | grep -q $name && ip netns del $name
