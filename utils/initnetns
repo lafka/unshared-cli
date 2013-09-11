@@ -16,8 +16,9 @@ ip netns list | grep -q $name || ip netns add $name
 
 ip link show $name > /dev/null 2>&1 || {
 	ip link add name $name type veth peer name $peername;
-	ifconfig $name $addr up;
-	ip link set dev $name netns $name; }
+	ip link set dev $name netns $name;
+	ip netns exec $name ifconfig lo 127.0.0.1 up;
+	ip netns exec $name ifconfig $name $addr up; }
 
 ifconfig $peername up
 
