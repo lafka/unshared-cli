@@ -32,7 +32,7 @@ set -e
 UNSHARED_ROOT=${UNSHARED_ROOT:-/var/unshared}
 UNSHARED_ARGS=""
 
-export NAME=${NAME:-"u-$(tr -cd 'a-z0-9A-Z' < /dev/urandom | head -c 4)"}
+export NAME
 export ROOT="${ROOT:-/}"
 export EXPR="${EXPR:=true}"
 export MOUNT="${MOUNT:-true}"
@@ -182,6 +182,7 @@ parse_args() {
 				exit 1 ;;
 		esac
 	done
+	NAME=${NAME:-"u-$(tr -cd 'a-z0-9A-Z' < /dev/urandom | head -c 4)"}
 }
 
 run_unshare() {
