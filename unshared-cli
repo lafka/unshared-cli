@@ -41,7 +41,11 @@ export POSTEXEC="${POSTEXEC:-true}"
        PREEXEC="true"
 
 get_root() {
-	[ ! -z "$1" ] && echo $UNSHARED_ROOT/$1 || echo "/"
+	if echo $1 | grep -qP '^/'; then
+		echo $1;
+	else
+		[ ! -z "$1" ] && echo $UNSHARED_ROOT/$1 || echo "/"
+	fi;
 }
 
 cleanup() {
