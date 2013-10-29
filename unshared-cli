@@ -195,13 +195,6 @@ run_unshare() {
 	POSTEXEC=$(eval 'echo '$(echo $POSTEXEC | sed 's/&/\\&/g'))
 	MOUNT=$(eval 'echo '$(echo $MOUNT | sed 's/&/\\&/g'))
 
-	echo "spawn $NAME in $ROOT"
-	echo "unshared: $UNSHARED_ARGS"
-	echo "preexec:  $PREEXEC"
-	echo "postexec: $POSTEXEC"
-	echo "mounts:    $MOUNT"
-	echo "execs:     $EXPR"
-
 	echo "=> Performing pre-exec tasks ..."
 	eval $PREEXEC || { echo "error executing preexec exiting"; exit 2; }
 
