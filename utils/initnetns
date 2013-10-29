@@ -12,13 +12,27 @@ name=$2
 peername=${name}peer
 addr=$3
 
-ip netns list | grep -q $name || ip netns add $name
+if ip netns list | grep -q $name; then
+	pids=$(ip netns pids $name)
+	if [ ! -z "$pids" ]; then
+		echo "netns $name have processes:"
+		for p in $pids; do ps --pid $p -o pid,ppid,start,ruser,command; done
+		exit 2
+	fi
+else
+	ip netns add $name
+fi
 
-ip link show $name > /dev/null 2>&1 || {
-	ip link add name $name type veth peer name $peername;
-	ip link set dev $name netns $name;
-	ip netns exec $name ifconfig lo 127.0.0.1 up;
-	ip netns exec $name ifconfig $name $addr up; }
+# In case of resume, let's ensure that the device exists in given ns
+if ip link show $peername > /dev/null 2>&1; then
+	ip netns exec $name ip link show $name > /dev/null 2>&1 || {
+		echo "missing dev in netns $name, manual cleanup"; exit 3; }
+else
+	ip link add name $name type veth peer name $peername
+	ip link set dev $name netns $name
+fi
+ip netns exec $name ifconfig lo 127.0.0.1 up
+ip netns exec $name ifconfig $name $addr up
 
 ifconfig $peername up
 

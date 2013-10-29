@@ -8,7 +8,24 @@ set -e
 
 bridge=$1
 name=$2
+peer=${name}peer
 
 brctl show | grep -qP "\s$name\$" && brctl delif $bridge $name
-ip link show $name > /dev/null 2>&1 && ip link delete dev $name
-ip netns list | grep -q $name && ip netns del $name
+ip link show $peer > /dev/null 2>&1 && ip link delete dev $peer
+pids=$(ip netns pids $name 2> /dev/null)
+if [ ! -z "$pids" ]; then
+	echo "Terminating $(echo $pids | wc -w) children in $name"
+	for p in $pids; do
+		ps --pid $p -o pid,ppid,start,ruser,command;
+	done
+	kill $pids 2> /dev/null
+	rpids=$(ip netns pids $name 2> /dev/null)
+	if [ ! -z "$pids" ]; then
+		echo "Waiting 5s for $(echo $pids | wc -w) children in $name"
+		sleep 5;
+		kill -9 $(ip netns pids $name 2> /dev/null) 2> /dev/null
+	fi
+fi
+
+ip netns del $name;
+
