@@ -34,11 +34,11 @@ UNSHARED_ARGS=""
 
 export NAME
 export ROOT="${ROOT:-/}"
-export EXPR="${EXPR:=true}"
-export MOUNT="${MOUNT:-true}"
+export EXPR="${EXPR:=}"
+export MOUNT="${MOUNT:-}"
 export CHROOT="${CHROOT:-chroot}"
-export POSTEXEC="${POSTEXEC:-true}"
-       PREEXEC="true"
+export POSTEXEC="${POSTEXEC:-}"
+       PREEXEC=""
 
 get_root() {
 	if echo $1 | grep -qP '^/'; then
@@ -77,17 +77,9 @@ run() {
 			echo "=> Mounting ..."
 			eval $MOUNT
 
-			echo "=> Preparing chroot ($ROOT)..."
-
-			echo "#!/bin/sh" > $ROOT/run-unshare-$NAME
-			echo "echo '=> Executing ...'" >> $ROOT/run-unshare-$NAME
-			echo $EXPR >> $ROOT/run-unshare >> $ROOT/run-unshare-$NAME
-
-			chmod +x $ROOT/run-unshare-$NAME
-
 			echo "=> Entering chroot ..."
 
-			eval $CHROOT $ROOT /run-unshare-$NAME
+			eval $CHROOT $ROOT $EXPR
 
 			echo "=> Post-exec ..."
 			eval $POSTEXEC
@@ -102,6 +94,10 @@ run() {
 			echo "usage: $0 spawn|invoker|get-root"
 			exit 1 ;;
 	esac
+}
+
+trim() {
+	echo $@ | sed -Ee 's/^(&&|\s)+//;s/(&&|\s)+$//'
 }
 
 parse_args() {
@@ -121,47 +117,32 @@ parse_args() {
 				shift 2;;
 
 			--exec )
-				cmd=""; shift;
+				shift;
 				while test $# -gt 0; do case $1 in
-					-*)
-						EXPR="$EXPR && $cmd"
-						break ;;
-					* )
-						cmd="$cmd $1"
-						shift ;;
+					-*) break 1 ;;
+					* ) EXPR="$EXPR $1"; shift ;;
 				esac; done ;;
 
 			--preexec )
-				cmd=""; shift;
+				shift;
 				while test $# -gt 0; do case $1 in
-					-*)
-						PREEXEC="$PREEXEC && $cmd"
-						break ;;
-					* )
-						cmd="$cmd $1"
-						shift ;;
+					-*) break 1 ;;
+					* ) PREEXEC="$PREEXEC $1"; shift ;;
 				esac; done ;;
 
 			--postexec )
-				cmd=""; shift;
+				shift;
 				while test $# -gt 0; do case $1 in
-					-*)
-						POSTEXEC="$POSTEXEC && $cmd"
-						break ;;
-					* )
-						cmd="$cmd $1"
-						shift ;;
+					-*) break 1 ;;
+					* ) POSTEXEC="$POSTEXEC $1"; shift ;;
 				esac; done ;;
 
 			--chroot )
-				cmd=""; shift;
+				shift;
+				CHROOT=
 				while test $# -gt 0; do case $1 in
-					-*)
-						CHROOT="$cmd"
-						break ;;
-					* )
-						cmd="$cmd $1"
-						shift ;;
+					-*) break 1 ;;
+					* ) CHROOT="$CHROOT $1"; shift ;;
 				esac; done ;;
 
 			--data-dir )
@@ -193,10 +174,19 @@ parse_args() {
 				exit 1 ;;
 		esac
 	done
+	PREEXEC=$(trim $PREEXEC)
+	EXPR=$(trim $EXPR)
+	POSTEXEC=$(trim $POSTEXEC)
 	NAME=${NAME:-"u-$(tr -cd 'a-z0-9A-Z' < /dev/urandom | head -c 4)"}
 }
 
 run_unshare() {
+	if echo $EXPR | grep -P ';|&&|\|\|'; then
+		echo "error: Can't use &&, || or ; operator in exec"
+		echo "Are you using multiple exec statements???"
+		exit 1
+	fi
+
 	# expand mount
 	PREEXEC=$(eval 'echo '$(echo $PREEXEC | sed 's/&/\\&/g'))
 	POSTEXEC=$(eval 'echo '$(echo $POSTEXEC | sed 's/&/\\&/g'))
@@ -206,14 +196,13 @@ run_unshare() {
 	eval $PREEXEC || { echo "error executing preexec exiting"; exit 2; }
 
 	echo "=> Calling unshare [$UNSHARED_ARGS]"
-	exec env -i \
+	echo env -i \
 		ROOT=$ROOT \
 		NAME=$NAME \
 		EXPR="$EXPR" \
 		MOUNT="$MOUNT" \
 		POSTEXEC="$POSTEXEC" \
 		CHROOT="$CHROOT" \
-		HOME="/var" \
 		unshare $UNSHARED_ARGS $0 invoker
 }
 
