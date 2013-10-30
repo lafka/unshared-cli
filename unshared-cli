@@ -131,14 +131,14 @@ parse_args() {
 			--preexec )
 				shift;
 				while test $# -gt 0; do case $1 in
-					-*) break 1 ;;
+					-*) PREEXEC="$PREEXEC &&"; break 1 ;;
 					* ) PREEXEC="$PREEXEC $1"; shift ;;
 				esac; done ;;
 
 			--postexec )
 				shift;
 				while test $# -gt 0; do case $1 in
-					-*) break 1 ;;
+					-*) POSTEXEC="$POSTEXEC &&"; break 1 ;;
 					* ) POSTEXEC="$POSTEXEC $1"; shift ;;
 				esac; done ;;
 
@@ -203,7 +203,7 @@ run_unshare() {
 		exit 1
 	fi
 
-	if [ "yes" == $fork ] && [ ! -z "$POSTEXEC" ]; then
+	if test "$fork" = "yes" && [ ! -z "$POSTEXEC" ]; then
 		echo "error: Forking will not handle any tasks defined with --postexec"
 		exit 1
 	fi
