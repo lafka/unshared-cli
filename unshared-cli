@@ -39,6 +39,7 @@ export MOUNT="${MOUNT:-}"
 export CHROOT="${CHROOT:-chroot}"
 export POSTEXEC="${POSTEXEC:-}"
        PREEXEC=""
+fork="no"
 
 get_root() {
 	if echo $1 | grep -qP '^/'; then
@@ -165,6 +166,9 @@ parse_args() {
 				MOUNT="$MOUNT && mount ${_data_opts} ${_data_src} \$ROOT/${_data_target} && mount --make-private \$ROOT/${_data_target}"
 
 				shift 2 ;;
+			--fork)
+				fork="yes"
+				;;
 			--)
 				shift;
 				EXPR="$EXPR && $@"
@@ -187,6 +191,11 @@ run_unshare() {
 		exit 1
 	fi
 
+	if [ "yes" == $fork ] && [ ! -z "$POSTEXEC" ]; then
+		echo "error: Forking will not handle any tasks defined with --postexec"
+		exit 1
+	fi
+
 	# expand mount
 	PREEXEC=$(eval 'echo '$(echo $PREEXEC | sed 's/&/\\&/g'))
 	POSTEXEC=$(eval 'echo '$(echo $POSTEXEC | sed 's/&/\\&/g'))
@@ -196,7 +205,7 @@ run_unshare() {
 	eval $PREEXEC || { echo "error executing preexec exiting"; exit 2; }
 
 	echo "=> Calling unshare [$UNSHARED_ARGS]"
-	echo env -i \
+	exec env -i \
 		ROOT=$ROOT \
 		NAME=$NAME \
 		EXPR="$EXPR" \
