@@ -219,6 +219,7 @@ run_unshare() {
 
 	echo "=> Calling unshare [$UNSHARED_ARGS]"
 	exec env -i \
+		HOME=/ \
 		ROOT=$ROOT \
 		NAME=$NAME \
 		EXPR="$EXPR" \
