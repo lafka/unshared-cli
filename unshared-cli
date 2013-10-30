@@ -36,6 +36,7 @@ export NAME
 export ROOT="${ROOT:-/}"
 export EXPR="${EXPR:=}"
 export MOUNT="${MOUNT:-}"
+export PRECHROOT="${PRECHROOT:-}"
 export CHROOT="${CHROOT:-chroot}"
 export POSTEXEC="${POSTEXEC:-}"
        PREEXEC=""
@@ -77,6 +78,9 @@ run() {
 		invoker )
 			echo "=> Mounting ..."
 			eval $MOUNT
+
+			echo "=> Preparing chroot ..."
+			eval $PRECHROOT
 
 			echo "=> Entering chroot ..."
 
@@ -138,6 +142,13 @@ parse_args() {
 					* ) POSTEXEC="$POSTEXEC $1"; shift ;;
 				esac; done ;;
 
+			--prechroot )
+				shift;
+				while test $# -gt 0; do case $1 in
+					-*) PRECHROOT="$PRECHROOT && "; break 1 ;;
+					* ) PRECHROOT="$PRECHROOT $1"; shift ;;
+				esac; done ;;
+
 			--chroot )
 				shift;
 				CHROOT=
@@ -179,6 +190,7 @@ parse_args() {
 		esac
 	done
 	PREEXEC=$(trim $PREEXEC)
+	PRECHROOT=$(trim $PRECHROOT)
 	EXPR=$(trim $EXPR)
 	POSTEXEC=$(trim $POSTEXEC)
 	NAME=${NAME:-"u-$(tr -cd 'a-z0-9A-Z' < /dev/urandom | head -c 4)"}
@@ -199,6 +211,7 @@ run_unshare() {
 	# expand mount
 	PREEXEC=$(eval 'echo '$(echo $PREEXEC | sed 's/&/\\&/g'))
 	POSTEXEC=$(eval 'echo '$(echo $POSTEXEC | sed 's/&/\\&/g'))
+	PRECHROOT=$(eval 'echo '$(echo $PRECHROOT | sed 's/&/\\&/g'))
 	MOUNT=$(eval 'echo '$(echo $MOUNT | sed 's/&/\\&/g'))
 
 	echo "=> Performing pre-exec tasks ..."
@@ -210,6 +223,7 @@ run_unshare() {
 		NAME=$NAME \
 		EXPR="$EXPR" \
 		MOUNT="$MOUNT" \
+		PRECHROOT="$PRECHROOT" \
 		POSTEXEC="$POSTEXEC" \
 		CHROOT="$CHROOT" \
 		unshare $UNSHARED_ARGS $0 invoker
