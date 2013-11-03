@@ -1,32 +1,42 @@
-#!/bin/bash
+#!/bin/sh
 
 # Original version by Rob Landley of http://landley.net
 
-mkchroot() {
-  [ $# -lt 2 ] && return
+set -e
 
+[ $# -lt 2 ] && { echo "usage: $0 <dest> targets ..."; exit 1; }
+
+mkchroot() {
   dest=$1
   shift
+
+  [ ! -d "$dest" ] && { echo "error: dir '$dest' does not exists"; exit 1; }
+
   for i in "$@"
   do
-    # Get an absolute path for the file
-    echo f: $i
-    [ "${i:0:1}" == "/" ] || i=$(which $i)
-    # Skip files that already exist at target.
-    [ -f "$dest/$i" ] && continue
-    if [ -e "$i" ]
+    echo $i | grep -qP '^\.?/' || i=$(readlink -f "$i")
+
+    # Skip if target already exist
+    [ -e "$dest/$i" ] && continue
+
+    if [  ! -e "$i" ]
     then
-      # Create destination path
-      d=`echo "$i" | grep -o '.*/'` &&
-      mkdir -p "$dest/$d" &&
-      # Copy file
-      cat "$i" > "$dest/$i" &&
-      chmod +x "$dest/$i"
+      echo "error: not found: $i"
+      exit 1
     else
-      echo "Not found: $i"
+      echo "$i -> $dest/$i"
+
+      # @todo find way to copy block devices, might be good to leave
+      # this to the caller
+      mkdir -p "$dest/$(dirname $i)"
+      cp -Lr "$i" "$dest/$i"
+
+      # Recursively copy shared libraries'
+      if [ -x "$i" ] && [ -f "$i" ]
+      then
+        mkchroot "$dest" $(ldd "$i" | grep -o '/.* ')
+      fi
     fi
-    # Recursively copy shared libraries' shared libraries.
-    mkchroot "$dest" $(ldd "$i" | egrep -o '/.* ')
   done
 }
 
