@@ -1,5 +1,7 @@
 # unshared-cli
 
+**Deprecated** - Linux is not made for this, needs alot of twerking to get a stable environment
+
 Scripts to provide a userland interface to for spawning containers
 with `unshare(1)`, mainly to provide a clean way of running processes
 in a isolated network namespace.
